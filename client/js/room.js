@@ -462,7 +462,7 @@ export async function exitRoom() {
 	return roomsData.length > 0;
 }
 
-window.addEventListener('whisper-session-ended', () => {
+function detachRooms() {
 	for (const rd of roomsData) {
 		rd.left = true;
 		rd.chat?.destruct?.();
@@ -473,7 +473,9 @@ window.addEventListener('whisper-session-ended', () => {
 	activeRoomIndex = -1;
 	const area = document.getElementById('chat-area');
 	if (area) area.replaceChildren();
-});
+}
+window.addEventListener('whisper-session-ended', detachRooms);
+window.addEventListener('whisper-session-detached', detachRooms);
 
 export { roomsData, activeRoomIndex };
 

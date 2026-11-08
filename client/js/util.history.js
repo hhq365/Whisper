@@ -64,27 +64,17 @@ async function ownSession(id) {
 export function initializeHistoryLifecycle() {
 	if (ready) return ready;
 	const id = beginSession();
-	// A BFCache restoration is a return visit, not a refresh.
+	// A cached document must reconnect and verify the server's room epoch before showing history.
 	window.addEventListener('pageshow', event => {
-		if (event.persisted) { abandonHistory(); location.reload(); }
+		if (event.persisted) location.reload();
 	});
-	let knownDeparture = false;
-	let sameURLReload = false;
-	window.navigation?.addEventListener('navigate', event => {
-		if (event.downloadRequest != null || event.destination.sameDocument) return;
-		// Address-bar Enter is a cross-document navigation to the exact same URL.
-		sameURLReload = event.navigationType !== 'traverse' && event.destination.url === location.href;
-		knownDeparture = event.navigationType !== 'reload' && !sameURLReload;
-		if (sameURLReload) prepareSessionReload(true);
-	});
-	window.addEventListener('pagehide', event => {
+	window.addEventListener('pagehide', () => {
 		try { localStorage.setItem('whisper-detached:' + sessionId(), String(Date.now())); } catch {}
-		if (knownDeparture || (event.persisted && !sameURLReload)) abandonHistory();
-		else {
-			// Chrome may omit navigate for address-bar/browser-initiated loads.
-			// Hand off only this exact URL; beginSession consumes it once.
-			prepareSessionReload(true);
-		}
+		prepareSessionReload(true);
+		// Leave the live room immediately, including when the browser caches this document.
+		// Keep this tab's recovery credentials so Back/Forward can reconnect; server expiry
+		// still prevents old records from returning after the room has been empty for 10s.
+		window.dispatchEvent(new Event('whisper-session-detached'));
 		releaseOwner?.();
 	});
 	ready = (async () => {

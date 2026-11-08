@@ -11,9 +11,9 @@ export function beginSession() {
 	try { previous = JSON.parse(sessionStorage.getItem(VAULT)); } catch {}
 	const navigationType = performance.getEntriesByType('navigation')[0]?.type;
 	const reload = navigationType === 'reload';
-	const sameURLReload = navigationType === 'navigate' && previous?.resumeURL === location.href;
+	const sameURLReload = ['navigate', 'back_forward'].includes(navigationType) && previous?.resumeURL === location.href;
 	// A real reload can resume without an unload handoff: mobile browsers may skip pagehide.
-	// Address-bar navigation needs a one-use same-URL handoff; other visits start fresh.
+	// Address-bar and history navigation consume a same-tab, same-URL handoff.
 	if ((reload || sameURLReload) && previous?.id && previous?.keys && typeof previous.keys === 'object') vault = previous;
 	else {
 		superseded = previous?.id;

@@ -20,8 +20,8 @@ test('reload restores identity even if pagehide did not mark a handoff',()=>{
 test('opening the URL normally does not restore an abandoned session',()=>{
  const s=session('navigate',true);assert.notEqual(s.beginSession(),'existing-tab');assert.equal(s.readSession(),null);
 });
-test('back/forward navigation does not restore old credentials',()=>{
- const s=session('back_forward',true);assert.notEqual(s.beginSession(),'existing-tab');assert.equal(s.readSession(),null);
+test('back/forward resumes this tab when returning to the room URL',()=>{
+ const s=session('back_forward',true,'https://example.test/?r=room');assert.equal(s.beginSession(),'existing-tab');assert.equal(s.readSession().rooms[0].userName,'Alice');
 });
 test('explicit discard still revokes the credentials',()=>{
  const s=session('reload',false);s.beginSession();s.discardSession();assert.equal(s.readSession(),null);
@@ -30,8 +30,8 @@ test('explicit discard still revokes the credentials',()=>{
 test('same-URL handoff resumes address-bar navigation',()=>{
  const s=session('navigate',true,'https://example.test/?r=room');assert.equal(s.beginSession(),'existing-tab');assert.equal(s.readSession().rooms[0].userName,'Alice');
 });
-test('handoff cannot resume a different URL or a history traversal',()=>{
- for(const [type,url] of [['navigate','https://example.test/?r=other'],['back_forward','https://example.test/?r=room']]) {
+test('handoff cannot resume a different URL',()=>{
+ for(const [type,url] of [['navigate','https://example.test/?r=other'],['back_forward','https://example.test/?r=other']]) {
   const s=session(type,true,url);assert.notEqual(s.beginSession(),'existing-tab');assert.equal(s.readSession(),null);
  }
 });

@@ -68,11 +68,8 @@ async page => {
     await send(p, 'leave-secret');
     stage = "6: await p.goto('about:blank');";
     await p.goto('about:blank');
-    await p.goBack();
-    await p.locator('#login-form').waitFor({state:'visible'});
-    stage = "7: await join(p);\n    check(!(await p.locator('#chat-area').textContent()).includes('leave";
-    await join(p);
-    check(!(await p.locator('#chat-area').textContent()).includes('leave-secret'), 'back navigation restored old history');
+    await p.goBack(); await ready(p);
+    await p.getByText('leave-secret', {exact:true}).waitFor();
     await send(p, 'close-secret');
     const closedURL = p.url(); await p.close();
     stage = '8: const reopened';
