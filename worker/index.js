@@ -1,3 +1,5 @@
+import presenceModule from '../server/room-presence.cjs';
+const { RoomPresence } = presenceModule;
 import { generateClientId, encryptMessage, decryptMessage, logEvent, isString, isObject, getTime } from './utils.js';
 
 export default {
@@ -29,6 +31,11 @@ export class ChatRoom {  constructor(state, env) {
     // Use objects like original server.js instead of Maps
     this.clients = {};
     this.channels = {};
+    this.roomPresence = new RoomPresence({ uuid: () => crypto.randomUUID(), send: (id, message) => {
+      const client = this.clients[id];
+      if (client?.shared) this.sendMessage(client.connection, encryptMessage(message, client.shared));
+    }});
+    this.cleanupTimer = setInterval(() => this.cleanupOldConnections(), 15000);
     
     this.config = {
       seenTimeout: 60000,
@@ -174,7 +181,7 @@ export class ChatRoom {  constructor(state, env) {
         return;
       }
 
-      logEvent('message', [clientId, message], 'debug');      // Handle key exchange
+      logEvent('message', clientId, 'debug');      // Handle key exchange
       if (!this.clients[clientId].shared && message.length < 2048) {
         try {
           // Generate ECDH key pair using P-384 curve (equivalent to secp384r1)
@@ -241,41 +248,19 @@ export class ChatRoom {  constructor(state, env) {
         this.processEncryptedMessage(clientId, message);
       }
     });    // Handle connection close
-    connection.addEventListener('close', async (event) => {
-      logEvent('close', [clientId, event], 'debug');
-
-      const channel = this.clients[clientId].channel;
-
-      if (channel && this.channels[channel]) {
-        this.channels[channel].splice(this.channels[channel].indexOf(clientId), 1);
-
-        if (this.channels[channel].length === 0) {
-          delete(this.channels[channel]);
-        } else {
-          try {
-            const members = this.channels[channel];
-
-            for (const member of members) {
-              const client = this.clients[member];              if (this.isClientInChannel(client, channel)) {
-                this.sendMessage(client.connection, encryptMessage({
-                  a: 'l',
-                  p: members.filter((value) => {
-                    return (value !== member ? true : false);
-                  })
-                }, client.shared));
-              }
-            }
-
-          } catch (error) {
-            logEvent('close-list', [clientId, error], 'error');
-          }
-        }
-      }
-
-      if (this.clients[clientId]) {
-        delete(this.clients[clientId]);
-      }
-    });
+    connection.addEventListener('close', () => this.removeClient(clientId));
+  }
+  removeClient(clientId) {
+    const client = this.clients[clientId];
+    if (!client) return;
+    this.roomPresence.leave(clientId);
+    const channel = client.channel;
+    delete this.clients[clientId];
+    if (channel && this.channels[channel]) {
+      this.channels[channel] = this.channels[channel].filter(id => id !== clientId);
+      if (!this.channels[channel].length) delete this.channels[channel];
+      else this.broadcastMemberList(channel);
+    }
   }
   // Process encrypted messages
   processEncryptedMessage(clientId, message) {
@@ -284,7 +269,7 @@ export class ChatRoom {  constructor(state, env) {
     try {
       decrypted = decryptMessage(message, this.clients[clientId].shared);
 
-      logEvent('message-decrypted', [clientId, decrypted], 'debug');
+      logEvent('message-decrypted', clientId, 'debug');
 
       if (!isObject(decrypted) || !isString(decrypted.a)) {
         return;
@@ -298,6 +283,8 @@ export class ChatRoom {  constructor(state, env) {
         this.handleClientMessage(clientId, decrypted);
       } else if (action === 'w') {
         this.handleChannelMessage(clientId, decrypted);
+      } else if (action === 'room_state') {
+        this.roomPresence.handle(clientId, decrypted);
       }
 
     } catch (error) {
@@ -323,6 +310,7 @@ export class ChatRoom {  constructor(state, env) {
         this.channels[channel].push(clientId);
       }
 
+      this.roomPresence.join(clientId, channel, decrypted);
       this.broadcastMemberList(channel);
 
     } catch (error) {
@@ -457,8 +445,9 @@ export class ChatRoom {  constructor(state, env) {
     for (const clientId of clientsToRemove) {
       try {
         logEvent('connection-seen', clientId, 'debug');
-        this.clients[clientId].connection.close();
-        delete this.clients[clientId];
+        const connection = this.clients[clientId].connection;
+        this.removeClient(clientId);
+        connection.close();
       } catch (error) {
         logEvent('connection-seen', error, 'error');      }
     }

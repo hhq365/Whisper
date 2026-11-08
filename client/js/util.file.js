@@ -1,6 +1,9 @@
+import { roomsData, activeRoomIndex, rememberFile } from './room.js';
+import { loadAttachment } from './util.history.js';
+import { renderChatArea } from './chat.js';
 // Import necessary modules
 // 导入必要的模块
-import { deflate, inflate } from 'fflate';
+import { deflate, inflate, zip } from 'fflate';
 import { showFileUploadModal } from './util.fileUpload.js';
 
 // 分卷大小统一配置
@@ -8,7 +11,7 @@ const DEFAULT_VOLUME_SIZE = 256 * 1024; // 512KB
 
 // File transfer state management
 // 文件传输状态管理
-window.fileTransfers = new Map();
+// Each room owns its transfers, including completed history attachments.
 
 // Base64 encoding for binary data (more efficient than hex)
 // Base64编码用于二进制数据（比十六进制更高效）
@@ -294,7 +297,7 @@ async function decompressArchiveToFiles(volumes, fileManifest, archiveHash = nul
 				}
 						// Extract files from archive
 				let dataOffset = 0;
-				const extractedFiles = [];
+				const extractedFiles = Object.create(null);
 						for (const fileInfo of fileManifest) {
 					// Read file metadata: [name_length(4)][name][size(8)][data]
 					const nameLengthBytes = decompressed.slice(dataOffset, dataOffset + 4);
@@ -315,24 +318,22 @@ async function decompressArchiveToFiles(volumes, fileManifest, archiveHash = nul
 					const fileData = decompressed.slice(dataOffset, dataOffset + fileSize);
 					dataOffset += fileSize;
 					
-					// Create and download file
-					const blob = new Blob([fileData]);
-					const url = URL.createObjectURL(blob);
+					const baseName = fileName.split(/[\\/]/).pop() || 'file';
+					let safeName = baseName;
+					let duplicate = 1;
+					while (safeName in extractedFiles) safeName = `${duplicate++}-${baseName}`;
+					extractedFiles[safeName] = fileData;
+				}
+				zip(extractedFiles, (error, data) => {
+					if (error) { reject(error); return; }
+					const url = URL.createObjectURL(new Blob([data], { type: 'application/zip' }));
 					const a = document.createElement('a');
 					a.href = url;
-					a.download = fileName;
-					document.body.appendChild(a);
-					a.click();
-					document.body.removeChild(a);
-					URL.revokeObjectURL(url);
-					
-					extractedFiles.push(fileName);
-					
-					// Add small delay between downloads to avoid overwhelming the browser
-					await new Promise(resolve => setTimeout(resolve, 100));
-				}
-				
-				resolve(extractedFiles);
+					a.download = `${fileManifest.length} files.zip`;
+					document.body.appendChild(a); a.click(); a.remove();
+					setTimeout(() => URL.revokeObjectURL(url), 1000);
+					resolve(Object.keys(extractedFiles));
+				});
 			});
 		});
 	} catch (error) {
@@ -358,15 +359,11 @@ export function setupFileSend({
 			e.preventDefault();
 			e.stopPropagation();
 			
-			showFileUploadModal(async (files) => {
-				// 传递 userName 给 onSend
-				const userName = window.roomsData && window.activeRoomIndex >= 0
-					? (window.roomsData[window.activeRoomIndex]?.myUserName || '')
-					: '';
-				await handleFilesUpload(files, (msg) => {
-					// 合并 userName 字段
-					onSend({ ...msg, userName });
-				});
+			const room = roomsData[activeRoomIndex];
+			if (!room?.connected) return;
+			const context = { room, targetId: room.privateChatTargetId, targetName: room.privateChatTargetName };
+			showFileUploadModal(async files => {
+				await handleFilesUpload(files, msg => onSend(msg, context), room);
 			});
 		});
 	}
@@ -374,7 +371,7 @@ export function setupFileSend({
 
 // Handle files upload
 // 处理文件上传
-async function handleFilesUpload(files, onSend) {
+async function handleFilesUpload(files, onSend, room) {
 	if (!files || files.length === 0) return;
 	
 	const fileId = generateFileId();
@@ -409,10 +406,11 @@ async function handleFilesUpload(files, onSend) {
 				totalVolumes: volumes.length,
 				sentVolumes: 0,
 				status: 'sending',
+				volumeData: volumes,
 				originalHash
 			};
 			
-			window.fileTransfers.set(fileId, fileTransfer);
+			room.fileTransfers.set(fileId, fileTransfer);
 			
 			// Send file start message
 			onSend({
@@ -426,7 +424,7 @@ async function handleFilesUpload(files, onSend) {
 			});
 			
 			// Send volumes
-			await sendVolumes(fileId, volumes, onSend, updateProgress, file.name);
+			await sendVolumes(fileId, volumes, onSend, updateProgress, file.name, room);
 			
 		} else {
 			// Multiple files upload - create archive
@@ -446,13 +444,14 @@ async function handleFilesUpload(files, onSend) {
 				totalVolumes: volumes.length,
 				sentVolumes: 0,
 				status: 'sending',
+				volumeData: volumes,
 				archiveHash,
 				fileCount,
 				fileManifest,
 				isArchive: true
 			};
 			
-			window.fileTransfers.set(fileId, fileTransfer);
+			room.fileTransfers.set(fileId, fileTransfer);
 			
 			// Send archive start message
 			onSend({
@@ -469,7 +468,7 @@ async function handleFilesUpload(files, onSend) {
 			});
 			
 			// Send volumes
-			await sendVolumes(fileId, volumes, onSend, updateProgress, `${files.length} files`);
+			await sendVolumes(fileId, volumes, onSend, updateProgress, `${files.length} files`, room);
 		}
 		
 	} catch (error) {
@@ -482,64 +481,30 @@ async function handleFilesUpload(files, onSend) {
 
 // Send volumes with progress tracking
 // 发送分卷并跟踪进度
-async function sendVolumes(fileId, volumes, onSend, updateProgress, fileName) {
-	const fileTransfer = window.fileTransfers.get(fileId);
-	if (!fileTransfer) return;
-	
-	let currentVolume = 0;
-	const batchSize = 5; // 每批发送5个分卷
-	
-	function sendNextBatch() {
-		if (currentVolume >= volumes.length) {
-			// 发送完成消息
-			onSend({
-				type: 'file_complete',
-				fileId
-			});
-			
-			fileTransfer.status = 'completed';
-			updateFileProgress(fileId);
-			updateProgress(`✓ Sent ${fileName} successfully`);
-			return;
-		}
-		
-		// 发送当前批次
-		const batchEnd = Math.min(currentVolume + batchSize, volumes.length);
-		const batch = [];
-		
-		for (let i = currentVolume; i < batchEnd; i++) {
-			batch.push({
-				type: 'file_volume',
-				fileId,
-				volumeIndex: i,
-				volumeData: volumes[i],
-				isLast: i === volumes.length - 1
-			});
-		}
-		
-		// 发送批次中的所有分卷
-		batch.forEach(volumeMsg => onSend(volumeMsg));
-		
-		// 更新发送进度
-		fileTransfer.sentVolumes = batchEnd;
-		updateFileProgress(fileId);
-		
-		currentVolume = batchEnd;
-		
-		// 继续发送下一批，使用较短的延迟
-		setTimeout(sendNextBatch, 100);
+async function sendVolumes(fileId, volumes, onSend, updateProgress, fileName, room) {
+	const transfer = room.fileTransfers.get(fileId);
+	if (!transfer) return;
+	for (let i = 0; i < volumes.length; i++) {
+		if (room.fileTransfers.get(fileId) !== transfer) throw new Error('Transfer cancelled');
+		onSend({ type: 'file_volume', fileId, volumeIndex: i, volumeData: volumes[i], isLast: i === volumes.length - 1 });
+		transfer.sentVolumes = i + 1;
+		updateFileProgress(fileId, room);
+		if ((i + 1) % 5 === 0) await new Promise(resolve => setTimeout(resolve, 100));
 	}
-	
-	// 开始发送
-	sendNextBatch();
+	onSend({ type: 'file_complete', fileId });
+	transfer.status = 'completed';
+	rememberFile(room, transfer);
+	updateFileProgress(fileId, room);
+	if (roomsData[activeRoomIndex] === room) renderChatArea();
 }
 
 // Update file progress in chat
 // 更新聊天中的文件进度
-function updateFileProgress(fileId) {
-	const transfer = window.fileTransfers.get(fileId);
+function updateFileProgress(fileId, room) {
+	if (roomsData[activeRoomIndex] !== room) return;
+	const transfer = room.fileTransfers.get(fileId);
 	if (!transfer) return;
-	const elements = document.querySelectorAll(`[data-file-id="${fileId}"]`);
+	const elements = document.querySelectorAll(`[data-file-id="${CSS.escape(fileId)}"]`);
 	elements.forEach(element => {
 		const progressContainer = element.querySelector('.file-progress-container');
 		const progressBar = element.querySelector('.file-progress');
@@ -547,7 +512,7 @@ function updateFileProgress(fileId) {
 		const downloadBtn = element.querySelector('.file-download-btn');
 		
 		// 判断是否为发送方（发送方没有volumeData）
-		const isSender = !transfer.volumeData || transfer.volumeData.length === 0;
+		const isSender = false; // Completed local copies can be downloaded by either participant.
 		
 		if (transfer.status === 'sending') {
 			const progress = (transfer.sentVolumes / transfer.totalVolumes) * 100;
@@ -612,25 +577,26 @@ function updateFileProgress(fileId) {
 
 // Handle incoming file messages
 // 处理接收到的文件消息
-export function handleFileMessage(message, isPrivate = false) {
+export function handleFileMessage(message, isPrivate = false, room = roomsData[activeRoomIndex]) {
+	if (!room || !message || typeof message.fileId !== 'string') return;
 	const { type, fileId, userName } = message;
 	
 	switch (type) {
 		case 'file_start':
-			handleFileStart(message, isPrivate);
+			handleFileStart(message, isPrivate, room);
 			break;
 		case 'file_volume':
-			handleFileVolume(message);
+			handleFileVolume(message, room);
 			break;
 		case 'file_complete':
-			handleFileComplete(message);
+			handleFileComplete(message, room);
 			break;
 	}
 }
 
 // Handle file start message
 // 处理文件开始消息
-function handleFileStart(message, isPrivate) {
+function handleFileStart(message, isPrivate, room) {
 	const { fileId, fileName, originalSize, compressedSize, totalVolumes, originalHash, archiveHash, fileCount, fileManifest, isArchive, userName } = message;
 	
 	const fileTransfer = {
@@ -650,10 +616,10 @@ function handleFileStart(message, isPrivate) {
 		userName // 记录发送者名字
 	};
 	
-	window.fileTransfers.set(fileId, fileTransfer);
+	room.fileTransfers.set(fileId, fileTransfer);
 	
 	// 添加文件消息到聊天
-	if (window.addOtherMsg) {
+	if (roomsData[activeRoomIndex] === room && window.addOtherMsg) {
 		let displayData;
 		if (isArchive) {
 			displayData = {
@@ -683,40 +649,49 @@ function handleFileStart(message, isPrivate) {
 
 // Handle file volume message
 // 处理文件分卷消息
-function handleFileVolume(message) {
+function handleFileVolume(message, room) {
 	const { fileId, volumeIndex, volumeData } = message;
-	const transfer = window.fileTransfers.get(fileId);
+	const transfer = room.fileTransfers.get(fileId);
 	
 	if (!transfer) return;
 	
+	if (!Number.isInteger(volumeIndex) || volumeIndex < 0 || volumeIndex >= transfer.totalVolumes || typeof volumeData !== 'string') return;
 	transfer.receivedVolumes.add(volumeIndex);
 	transfer.volumeData[volumeIndex] = volumeData;
 	
-	updateFileProgress(fileId);
+	updateFileProgress(fileId, room);
 }
 
 // Handle file complete message
 // 处理文件完成消息
-function handleFileComplete(message) {
+function handleFileComplete(message, room) {
 	const { fileId } = message;
-	const transfer = window.fileTransfers.get(fileId);
+	const transfer = room.fileTransfers.get(fileId);
 	
 	if (!transfer) return;
 	
 	// 检查是否所有分卷都已接收
 	if (transfer.receivedVolumes.size === transfer.totalVolumes) {
 		transfer.status = 'completed';
-		updateFileProgress(fileId);
+		rememberFile(room, transfer);
+		updateFileProgress(fileId, room);
 	}
 }
 
 // Download file from volumes
 // 从分卷下载文件
 export async function downloadFile(fileId) {
-	const transfer = window.fileTransfers.get(fileId);
+	const room = roomsData[activeRoomIndex];
+	if (!room) return;
+	const transfer = room.fileTransfers.get(fileId);
 	if (!transfer || transfer.status !== 'completed') return;
 	
 	try {
+		if (transfer.attachmentId) {
+			const data = await loadAttachment(transfer.scope, transfer.attachmentId);
+			if (!data) throw new Error('File expired or was removed from local storage');
+			transfer.volumeData = JSON.parse(await data.text());
+		}
 		if (transfer.isArchive) {
 			// Download archive as multiple files
 			await decompressArchiveToFiles(transfer.volumeData, transfer.fileManifest, transfer.archiveHash);

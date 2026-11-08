@@ -1,4 +1,4 @@
-# NodeCrypt
+# Whisper
 
 🌐 **[中文版 README](README.md)**
 
@@ -29,7 +29,7 @@ Use `npm run deploy` to deploy to Cloudflare Workers.
 
 ## 📝 Project Introduction
 
-NodeCrypt is a truly end-to-end encrypted chat system that implements a complete zero-knowledge architecture. The entire system design ensures that servers, network intermediaries, and even system administrators cannot access any plaintext message content. All encryption and decryption operations are performed locally on the client side, with the server serving only as a blind relay for encrypted data.
+Whisper is a truly end-to-end encrypted chat system that implements a complete zero-knowledge architecture. The entire system design ensures that servers, network intermediaries, and even system administrators cannot access any plaintext message content. All encryption and decryption operations are performed locally on the client side, with the server serving only as a blind relay for encrypted data.
 
 ### System Architecture
 - **Frontend**: ES6+ modular JavaScript, no framework dependencies
@@ -41,16 +41,16 @@ NodeCrypt is a truly end-to-end encrypted chat system that implements a complete
 
 ### Core Principles
 - **Server Blind Relay**: The server can never decrypt message content, only responsible for encrypted data relay
-- **No Database Storage**: The system does not use any persistent storage; all data exists only temporarily in memory
+- **No Database Storage**: The server does not persist chat messages; this browser uses temporary encrypted caches for refresh recovery
 - **End-to-End Encryption**: Messages are encrypted from sender to receiver throughout the entire process; no intermediary can decrypt them
-- **Forward Secrecy**: Even if keys are compromised, historical messages cannot be decrypted because there are no historical messages at all
+- **Forward Secrecy**: Connections negotiate new keys on reconnect; refresh caches use separate local session keys
 - **Anonymous Communication**: Users do not need to register real identities; supports temporary anonymous chat
 - **Rich Experience**: Support for sending images and files, with optional themes and languages
 
 ### Privacy Protection Mechanisms
 
 - **Real-time Member Notifications**: The room online list is completely transparent; any member joining or leaving will notify all members in real-time
-- **No Historical Messages**: Newly joined users cannot see any historical chat records
+- **History invitations**: Ordinary invitations show new messages; history invitations retrieve available public records from online peers
 - **Private Chat Encryption**: Clicking on a user's avatar can initiate end-to-end encrypted private conversations that are completely invisible to other room members
 
 ### Room Password Mechanism
@@ -165,6 +165,20 @@ This project is for educational and technical research purposes only and must no
 
 ---
 
-**NodeCrypt** - True End-to-End Encrypted Communication 🔐
+**Whisper** - True End-to-End Encrypted Communication 🔐
 
 *"In the digital age, encryption is the last line of defense for privacy"*
+
+## Browser-held room history
+
+Public text, images and completed files are replicated between member browsers. The server only relays encrypted traffic and keeps in-memory presence, epoch, sequence and invitation/resume metadata. It stores no messages, encrypted history or attachments. There is no day or record-count limit; browser memory and storage quotas apply.
+
+“Share room” includes the room and optional password and shows messages from the join boundary onward. “Share room and history” creates a distinct epoch-scoped invitation for public records visible to the sharer at creation time. Online peers may supply only records within that invitation. Private messages and files are excluded. Ordinary members only receive and retain records from their join boundary onward. History invitations freeze the displayed record set; other donors cannot expand it. Older records are lost when their last holder leaves, even if newer members remain. Any member may create a history invitation. Members remain trusted participants; a group key is shared between them.
+
+Wait for peer synchronization to finish before the source member leaves, especially for large files. Losing every complete copy before replication finishes loses the missing content. There is no server backup. A 10-second grace after the last key holder disconnects allows a refresh with its existing session credentials to restore copies. After expiry the epoch and history tokens are invalidated. Unkeyed visitors cannot keep the old epoch alive. Server restarts also reset the epoch.
+
+Refresh recovery uses per-tab sessionStorage credentials and temporary encrypted IndexedDB caches. Explicit exit removes that tab’s room data. Navigation away and reopening do not restore its old session, but a valid history invitation can retrieve copies from online peers. Internal room/tab switching is not an exit. On an unclean network loss the server first needs to detect disconnection (60-second heartbeat timeout, checked every 15 seconds). Forced termination cannot guarantee immediate physical disk erasure; orphan ciphertext is cleaned on later visits and cannot automatically restore across epochs.
+
+The original reversible `r`/`p` invitation encoding remains, so link holders can recover the password. `h` grants public history access within the current epoch; legacy `d` is ignored. Updating clears incompatible caches. Deploy frontend and Worker/Node backend together: new channel identifiers include a password digest and do not interoperate with older clients.
+
+Invitations contain sequence-range metadata, never message content. Messages sent after invitation creation but before joining are excluded; messages sent after joining arrive normally. Refresh and re-sharing preserve historical gaps. Invitation ranges are held only in server memory and expire with the room epoch.

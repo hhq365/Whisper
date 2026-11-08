@@ -1,4 +1,5 @@
 #!/usr/bin/env nodejs
+const { RoomPresence } = require('./room-presence.cjs');
 
 'use strict';
 
@@ -63,6 +64,27 @@ console.log('server started', config.wsHost, config.wsPort);
 
 var clients = {};
 var channels = {};
+const roomPresence = new RoomPresence({ uuid: () => crypto.randomUUID(), send: (id, message) => {
+  const client = clients[id];
+  if (client?.shared) sendMessage(client.connection, encryptMessage(message, client.shared));
+}});
+setInterval(() => {
+  for (const [id, client] of Object.entries(clients)) {
+    if (client.seen < Date.now() - config.seenTimeout) { removeClient(id); client.connection.terminate(); }
+  }
+}, 15000).unref();
+function removeClient(id) {
+  const client = clients[id];
+  if (!client) return;
+  roomPresence.leave(id);
+  delete clients[id];
+  const channel = client.channel;
+  if (channel && channels[channel]) {
+    channels[channel] = channels[channel].filter(member => member !== id);
+    if (!channels[channel].length) delete channels[channel];
+    else broadcastMemberList(channel);
+  }
+}
 
 // WebSocket server connection event handler
 // WebSocket 服务器连接事件处理程序
@@ -143,7 +165,7 @@ wss.on('connection', (connection) => {
 			return;
 		}
 
-		logEvent('message', [clientId, message], 'debug');
+		logEvent('message', clientId, 'debug');
 
 		if (
 			!clients[clientId].shared &&
@@ -190,73 +212,7 @@ wss.on('connection', (connection) => {
 
 
 
-	connection.on('close', (event) => {
-
-		logEvent('close', [clientId, event], 'debug');
-
-
-		const channel = clients[clientId].channel;
-
-		if (
-			channel &&
-			channels[channel]
-		) {
-
-			channels[channel].splice(channels[channel].indexOf(clientId), 1);
-
-			if (
-				channels[channel].length === 0
-			) {
-
-
-				delete(channels[channel]);
-
-			} else {
-
-
-				try {
-
-					const members = channels[channel];
-
-					for (
-						const member of members
-					) {
-
-						const client = clients[member];
-
-						if (
-							isClientInChannel(client, channel)
-						) {
-							sendMessage(client.connection, encryptMessage({
-								a: 'l',
-								p: members.filter((value) => {
-									return (
-										value !== member ?
-										true :
-										false
-									);
-								})
-							}, client.shared));
-						}
-
-					}
-
-				} catch (error) {
-					logEvent('close-list', [clientId, error], 'error');
-				}
-
-			}
-
-		}
-
-
-		if (
-			clients[clientId]
-		) {
-			delete(clients[clientId]);
-		}
-
-	});
+	connection.on('close', () => removeClient(clientId));
 
 });
 
@@ -268,7 +224,7 @@ const processEncryptedMessage = (clientId, message) => {
 	try {
 		decrypted = decryptMessage(message, clients[clientId].shared);
 
-		logEvent('message-decrypted', [clientId, decrypted], 'debug');
+		logEvent('message-decrypted', clientId, 'debug');
 
 		if (
 			!isObject(decrypted) ||
@@ -285,6 +241,8 @@ const processEncryptedMessage = (clientId, message) => {
 			handleClientMessage(clientId, decrypted);
 		} else if (action === 'w') {
 			handleChannelMessage(clientId, decrypted);
+		} else if (action === 'room_state') {
+			roomPresence.handle(clientId, decrypted);
 		}
 
 	} catch (error) {
@@ -315,6 +273,7 @@ const handleJoinChannel = (clientId, decrypted) => {
 			channels[channel].push(clientId);
 		}
 
+		roomPresence.join(clientId, channel, decrypted);
 		broadcastMemberList(channel);
 
 	} catch (error) {

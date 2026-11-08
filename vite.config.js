@@ -47,9 +47,7 @@ export default defineConfig({
 				// 手动分块
 				manualChunks: (id) => {
 					if (id.includes('node_modules')) {
-						if (/aes-js|elliptic|js-chacha20|js-sha256/.test(id)) {
-							return 'crypto-libs'
-						}
+						// Keep CommonJS crypto libraries with their shared dependencies.
 						return 'vendor-deps'
 					}
 					return undefined

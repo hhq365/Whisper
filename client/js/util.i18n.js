@@ -1,5 +1,5 @@
-// Simple i18n utility for NodeCrypt
-// NodeCrypt 简单国际化工具
+// Simple i18n utility for Whisper
+// Whisper 简单国际化工具
 
 // Language definitions
 // 语言定义
@@ -9,13 +9,22 @@ const LANGUAGES = {
 		name: 'English',
 		flag: '🇺🇸',
 		translations: {
-			// Meta tags for SEO
-			'meta.description': 'NodeCrypt - True end-to-end encrypted chat system, no database, all messages encrypted locally, server only relays encrypted data, supports Cloudflare Workers, Docker, self-hosting and local development.',
-			'meta.keywords': 'end-to-end encryption, security, chat, WebSocket, Cloudflare Workers, JavaScript, E2EE, anonymous communication, AES, ECDH, RSA, ChaCha20, security, open source, NodeCrypt, shuaiplus',
-			'meta.og_title': 'NodeCrypt - End-to-End Encrypted Chat System',
-			'meta.og_description': 'NodeCrypt is a zero-knowledge, end-to-end encrypted open source chat system where all encryption and decryption is done locally on the client side, and servers cannot access plaintext. Supports multi-platform deployment, secure, anonymous, no message history.',
-			'meta.twitter_title': 'NodeCrypt - End-to-End Encrypted Chat System',
-			'meta.twitter_description': 'NodeCrypt is a zero-knowledge, end-to-end encrypted open source chat system where all encryption and decryption is done locally on the client side, and servers cannot access plaintext.',
+			"history.sync": "Syncing records from online members… Keep a source member online until finished.",
+			"history.expired": "This history invitation has expired. A new room session has started.",
+            "history.saving": "Saving on this device…",
+			"history.error": "Local history unavailable. New messages may not be saved.",
+			"history.session_error": "Session storage unavailable. Refresh may require joining again.",
+			"history.connecting": "Connecting… If offline, reconnecting automatically. You can leave and try again.",
+			"history.leave": "Leave room",
+			"history.restored": "Local history · earlier messages",
+			"history.private_to": "Private to",
+			// Metadata
+			'meta.description': 'Whisper',
+			'meta.keywords': 'end-to-end encryption, security, chat, WebSocket, Cloudflare Workers, JavaScript, E2EE, anonymous communication, AES, ECDH, RSA, ChaCha20, security, open source, Whisper, shuaiplus',
+			'meta.og_title': 'Whisper',
+			'meta.og_description': 'Whisper',
+			'meta.twitter_title': 'Whisper',
+			'meta.twitter_description': 'Whisper',
 			
 			// Login and main UI
 			'ui.enter_node': 'Enter a Room',
@@ -70,7 +79,8 @@ const LANGUAGES = {
 			'notification.private': '(Private)',
 			
 			// Actions and menu
-			'action.share': 'Share',
+			'action.share': 'Share room',
+			'action.share_history': 'Share room and history',
 			'action.exit': 'Exit',
 			'action.emoji': 'Emoji',
 			'action.settings': 'Settings',
@@ -96,7 +106,7 @@ const LANGUAGES = {
 			'help.title': 'User Guide',
 			'help.back_to_login': 'Back to Login',
 			'help.usage_guide': 'User Guide',
-			'help.what_is_nodecrypt': '🔐 What is NodeCrypt?',			'help.what_is_nodecrypt_desc': 'NodeCrypt is a true zero-knowledge end-to-end encrypted chat system. With a database-free architecture, all messages are encrypted locally on your device, and the server serves only as an encrypted data relay station, unable to access any of your plaintext content.',
+			'help.what_is_nodecrypt': '🔐 What is Whisper?',			'help.what_is_nodecrypt_desc': 'Whisper is a true zero-knowledge end-to-end encrypted chat system. With a database-free architecture, all messages are encrypted locally on your device, and the server serves only as an encrypted data relay station, unable to access any of your plaintext content.',
 			'help.how_to_start': '🚀 Quick Start',
 			'help.step_username': 'Enter Username',
 			'help.step_username_desc': 'Choose a display name for the room, can be any name you like',
@@ -110,8 +120,8 @@ const LANGUAGES = {
 			'help.e2e_encryption_desc': 'Uses AES-256 + ECDH encryption algorithm, messages can only be decrypted by you and the recipient',
 			'help.password_enhanced_encryption': '🔐 Password Enhanced Encryption',
 			'help.password_enhanced_encryption_desc': 'Room password directly participates in encryption key generation, providing additional security protection layer',
-			'help.no_history': '🚫 Zero History Records',
-			'help.no_history_desc': 'All messages exist only in current session, offline users cannot get historical messages',
+			'help.no_history': '💾 Room history',
+			'help.no_history_desc': 'Public history is held by online members, with a 10-second refresh grace when empty. Share room only receives and saves new messages; share room and history includes only public records visible to the sharer when the link is created.',
 			'help.anonymous_communication': '🎭 Complete Anonymity',
 			'help.anonymous_communication_desc': 'No account registration required, no personal information collected',
 			'help.decentralized': '🌐 Decentralized',
@@ -133,13 +143,22 @@ const LANGUAGES = {
 		name: '中文',
 		flag: '🇨🇳',
 		translations: {
-			// Meta tags for SEO
-			'meta.description': 'NodeCrypt - 真正的端到端加密聊天系统，无数据库，所有消息本地加密，服务器仅做加密数据中转，支持 Cloudflare Workers、Docker、自托管和本地开发。',
-			'meta.keywords': '端到端加密, 安全, 聊天, WebSocket, Cloudflare Workers, JavaScript, E2EE, 匿名通信, AES, ECDH, RSA, ChaCha20, 安全, 开源, NodeCrypt, shuaiplus',
-			'meta.og_title': 'NodeCrypt - 端到端加密聊天系统',
-			'meta.og_description': 'NodeCrypt 是一个端到端加密的开源聊天系统，所有加密解密均在客户端本地完成，服务器无法获取明文。支持多平台部署，安全、匿名、无历史消息。',
-			'meta.twitter_title': 'NodeCrypt - 端到端加密聊天系统',
-			'meta.twitter_description': 'NodeCrypt 是一个端到端加密的开源聊天系统，所有加密解密均在客户端本地完成，服务器无法获取明文。',
+			"history.sync": "正在从在线成员同步记录，请等同步完成再让原成员离开。",
+			"history.expired": "此记录邀请已失效，当前已开始新的房间会话。",
+            "history.saving": "正在保存到本机…",
+			"history.error": "本机记录暂不可用，新消息可能无法保存。",
+			"history.session_error": "无法保存会话，刷新后可能需要重新加入。",
+			"history.connecting": "正在连接…断网后会自动重连，也可退出后重试。",
+			"history.leave": "退出房间",
+			"history.restored": "本机历史记录 · 较早消息",
+			"history.private_to": "私信给",
+			// Metadata
+			'meta.description': 'Whisper',
+			'meta.keywords': '端到端加密, 安全, 聊天, WebSocket, Cloudflare Workers, JavaScript, E2EE, 匿名通信, AES, ECDH, RSA, ChaCha20, 安全, 开源, Whisper, shuaiplus',
+			'meta.og_title': 'Whisper',
+			'meta.og_description': 'Whisper',
+			'meta.twitter_title': 'Whisper',
+			'meta.twitter_description': 'Whisper',
 			
 			// Login and main UI
 			'ui.enter_node': '进入新的房间',
@@ -194,7 +213,8 @@ const LANGUAGES = {
 			'notification.private': '（私信）',
 			
 			// Actions and menu
-			'action.share': '分享',
+			'action.share': '分享房间',
+			'action.share_history': '分享房间和记录',
 			'action.exit': '退出',
 			'action.emoji': '表情',
 			'action.settings': '设置',
@@ -221,7 +241,7 @@ const LANGUAGES = {
 			'help.title': '使用说明',
 			'help.back_to_login': '返回登录',
 			'help.usage_guide': '使用说明',
-			'help.what_is_nodecrypt': '🔐 什么是 NodeCrypt？',			'help.what_is_nodecrypt_desc': 'NodeCrypt 是一个真正的端到端加密聊天系统。采用无数据库架构，所有消息在您的设备上本地加密，服务器仅作为加密数据的中转站，无法获取您的任何明文内容。',
+			'help.what_is_nodecrypt': '🔐 什么是 Whisper？',			'help.what_is_nodecrypt_desc': 'Whisper 是一个真正的端到端加密聊天系统。采用无数据库架构，所有消息在您的设备上本地加密，服务器仅作为加密数据的中转站，无法获取您的任何明文内容。',
 			'help.how_to_start': '🚀 快速开始',
 			'help.step_username': '输入用户名',
 			'help.step_username_desc': '选择一个在房间中显示的昵称，可以是任何您喜欢的名称',
@@ -236,8 +256,8 @@ const LANGUAGES = {
 			'help.e2e_encryption_desc': '使用 AES-256 + ECDH 加密算法，消息仅您和接收者可解密',
 			'help.password_enhanced_encryption': '🔐 密码增强加密',
 			'help.password_enhanced_encryption_desc': '房间密码直接参与加密密钥生成，提供额外的安全保护层',
-			'help.no_history': '🚫 零历史记录',
-			'help.no_history_desc': '所有消息仅存在于当前会话，离线用户无法获取历史消息',
+			'help.no_history': '💾 房间记录',
+			'help.no_history_desc': '公共记录由在线成员保管，全员离开后仅保留10秒刷新重连窗口。分享房间只接收和保存加入后的消息；分享房间和记录仅包含分享者生成链接时可见的公共记录。',
 			'help.anonymous_communication': '🎭 完全匿名',
 			'help.anonymous_communication_desc': '无需注册账户，不收集任何个人信息',
 			'help.decentralized': '🌐 去中心化',

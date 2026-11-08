@@ -1,0 +1,77 @@
+- generic [ref=f53e2]:
+  - generic [ref=f53e4]:
+    - generic [ref=f53e5]:
+      - button "使用说明" [ref=f53e6] [cursor=pointer]
+      - heading "进入新的房间" [level=1] [ref=f53e11]
+      - generic [ref=f53e12]:
+        - generic [ref=f53e13]:
+          - textbox "用户名" [ref=f53e14]:
+            - /placeholder: ""
+          - generic: 用户名
+        - generic [ref=f53e15]:
+          - textbox "房间名称" [ref=f53e16]:
+            - /placeholder: ""
+          - generic: 房间名称
+        - generic [ref=f53e17]:
+          - textbox "房间密码 （可选）" [ref=f53e18]:
+            - /placeholder: ""
+          - generic: 房间密码 （可选）
+        - button "确定" [ref=f53e19] [cursor=pointer]
+    - generic [ref=f53e20]:
+      - heading "使用说明" [level=2] [ref=f53e21]
+      - generic [ref=f53e22]:
+        - generic [ref=f53e23]:
+          - heading "🔐 什么是 Whisper？" [level=3] [ref=f53e24]
+          - paragraph [ref=f53e25]: Whisper 是一个真正的端到端加密聊天系统。采用无数据库架构，所有消息在您的设备上本地加密，服务器仅作为加密数据的中转站，无法获取您的任何明文内容。
+        - generic [ref=f53e26]:
+          - heading "🚀 快速开始" [level=3] [ref=f53e27]
+          - list [ref=f53e28]:
+            - listitem [ref=f53e29]:
+              - strong [ref=f53e30]: 输入用户名
+              - text: ： 选择一个在房间中显示的昵称，可以是任何您喜欢的名称
+            - listitem [ref=f53e31]:
+              - strong [ref=f53e32]: 设置房间名
+              - text: ： 房间的唯一标识符，相当于房间号
+            - listitem [ref=f53e33]:
+              - strong [ref=f53e34]: 设置房间密码
+              - text: ： 用于区分不同房间，同时参与加密过程，提升安全性
+            - listitem [ref=f53e35]:
+              - strong [ref=f53e36]: 点击"加入房间"
+              - text: ： 系统将自动生成加密密钥，开始安全聊天
+          - generic [ref=f53e37]:
+            - strong [ref=f53e38]: ⚠️ 重要提示
+            - text: ：相同房间名但不同密码的是两个完全独立的房间，无法相互通信。
+        - generic [ref=f53e39]:
+          - heading "🔑 安全特性" [level=3] [ref=f53e40]
+          - list [ref=f53e41]:
+            - listitem [ref=f53e42]:
+              - strong [ref=f53e43]: 🛡️ 端到端加密
+              - text: ： 使用 AES-256 + ECDH 加密算法，消息仅您和接收者可解密
+            - listitem [ref=f53e44]:
+              - strong [ref=f53e45]: 🔐 密码增强加密
+              - text: ： 房间密码直接参与加密密钥生成，提供额外的安全保护层
+            - listitem [ref=f53e46]:
+              - strong [ref=f53e47]: 💾 房间记录
+              - text: ： 公共记录由在线成员保管，全员离开后仅保留10秒刷新重连窗口。分享房间只接收和保存加入后的消息；分享房间和记录仅包含分享者生成链接时可见的公共记录。
+            - listitem [ref=f53e48]:
+              - strong [ref=f53e49]: 🎭 完全匿名
+              - text: ： 无需注册账户，不收集任何个人信息
+            - listitem [ref=f53e50]:
+              - strong [ref=f53e51]: 🌐 去中心化
+              - text: ： 支持自托管部署，服务器不参与加密解密过程
+        - generic [ref=f53e52]:
+          - heading "💡 使用技巧" [level=3] [ref=f53e53]
+          - list [ref=f53e54]:
+            - listitem [ref=f53e55]:
+              - strong [ref=f53e56]: 私人对话
+              - text: ：使用复杂的房间名和密码，只分享给特定人员
+            - listitem [ref=f53e57]:
+              - strong [ref=f53e58]: 群聊
+              - text: ：使用简单易记的房间名和密码，方便多人加入
+            - listitem [ref=f53e59]:
+              - strong [ref=f53e60]: 安全提醒
+              - text: ：房间名和密码都需要完全一致才能进入同一个房间
+            - listitem [ref=f53e61]:
+              - strong [ref=f53e62]: 密码策略
+              - text: ：建议使用包含字母、数字和符号的强密码
+  - generic [ref=f53e63]: Whisper © 2026

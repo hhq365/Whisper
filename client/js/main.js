@@ -1,3 +1,6 @@
+import { initializeHistoryLifecycle } from './util.history.js';
+import { renderChatArea } from './chat.js';
+import { restoreSession } from './room.js';
 // 导入 NodeCrypt 模块（加密功能模块）
 // Import the NodeCrypt module (used for encryption)
 import './NodeCrypt.js';
@@ -85,7 +88,7 @@ import {	renderUserList,       // 渲染用户列表 / Render user list
 window.config = {
 	wsAddress: `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`, // WebSocket 服务器地址 / WebSocket server address
 	//wsAddress: `wss://crypt.works`,
-	debug: true                       // 是否开启调试模式 / Enable debug mode
+	debug: false                       // 是否开启调试模式 / Enable debug mode
 };
 
 // 在文档开始加载前就初始化语言设置，防止闪烁
@@ -105,7 +108,12 @@ window.downloadFile = downloadFile;
 
 // 当 DOM 内容加载完成后执行初始化逻辑
 // Run initialization logic when the DOM content is fully loaded
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+	try { await initializeHistoryLifecycle(); } catch (error) {
+		console.warn('Session history unavailable', error);
+		$id('history-error').hidden = false;
+	}
+
 	// 移除预加载样式类，允许过渡效果
 	// Remove preload class to allow transitions
 	setTimeout(() => {
@@ -137,7 +145,10 @@ window.addEventListener('DOMContentLoaded', () => {
 	
 	// 初始化辅助功能和界面设置
 	// Initialize autofill, input placeholders, and menus
-	autofillRoomPwd();	setupInputPlaceholder();
+	autofillRoomPwd();
+	restoreSession();
+	$id('leave-reconnecting')?.addEventListener('click', () => { document.querySelector('[data-action="exit"]')?.click(); });
+	setupInputPlaceholder();
 	setupMoreBtnMenu();
 	setupImagePreview();	setupEmojiPicker();
 	// 由于我们已经在DOM加载前预先初始化了语言设置，这里不需要重复初始化
@@ -174,7 +185,7 @@ window.addEventListener('DOMContentLoaded', () => {
 		input.addEventListener('keydown', (e) => {
 			// 按下 Enter 键并且不按 Shift，表示发送消息
 			// Pressing Enter (without Shift) sends the message
-			if (e.key === 'Enter' && !e.shiftKey) {
+			if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
 				e.preventDefault();
 				sendMessage();
 			}
@@ -190,7 +201,7 @@ window.addEventListener('DOMContentLoaded', () => {
 		if (!text && images.length === 0) return; // 如果没有文本且没有图片，则不发送
 		const rd = roomsData[activeRoomIndex]; // 当前房间数据 / Current room data
 		
-		if (rd && rd.chat) {
+		if (rd && rd.chat && rd.connected) {
 			if (images.length > 0) {
 				// 发送包含图片的消息 (支持多图和文字合并)
 				// Send message with images (supports multiple images and text combined)
@@ -223,7 +234,7 @@ window.addEventListener('DOMContentLoaded', () => {
 				} else {
 					// 公共频道图片消息发送
 					// Send image message to public channel
-					rd.chat.sendChannelMessage('image', messageContent);
+					// Public messages are delivered by the browser history replication channel.
 					addMsg(messageContent, false, 'image');
 				}
 				
@@ -255,7 +266,7 @@ window.addEventListener('DOMContentLoaded', () => {
 				} else {
 					// 公共频道消息发送
 					// Send public message
-					rd.chat.sendChannelMessage('text', text);
+					// Persist and replicate through rememberMessage.
 					addMsg(text);				}
 			}
 			
@@ -282,47 +293,24 @@ window.addEventListener('DOMContentLoaded', () => {
 		inputSelector: '.input-message-input', // 消息输入框选择器 / Message input selector
 		attachBtnSelector: '.chat-attach-btn', // 附件按钮选择器 / Attach button selector
 		fileInputSelector: '.new-message-wrapper input[type="file"]', // 文件输入框选择器 / File input selector
-		onSend: (message) => {
-			const rd = roomsData[activeRoomIndex];
-			if (rd && rd.chat) {
-				const userName = rd.myUserName || '';
-				const msgWithUser = { ...message, userName };
-				if (rd.privateChatTargetId) {
-					// 私聊文件加密并发送
-					// Encrypt and send private file message
-					const targetClient = rd.chat.channel[rd.privateChatTargetId];
-					if (targetClient && targetClient.shared) {
-						const clientMessagePayload = {
-							a: 'm',
-							t: msgWithUser.type + '_private',
-							d: msgWithUser
-						};
-						const encryptedClientMessage = rd.chat.encryptClientMessage(clientMessagePayload, targetClient.shared);
-						const serverRelayPayload = {
-							a: 'c',
-							p: encryptedClientMessage,
-							c: rd.privateChatTargetId
-						};
-						const encryptedMessageForServer = rd.chat.encryptServerMessage(serverRelayPayload, rd.chat.serverShared);
-						rd.chat.sendMessage(encryptedMessageForServer);
-						
-						// 添加到自己的聊天记录
-						if (msgWithUser.type === 'file_start') {
-							addMsg(msgWithUser, false, 'file_private');
-						}					} else {
-						addSystemMsg(`${t('system.private_file_failed', 'Cannot send private file to')} ${rd.privateChatTargetName}. ${t('system.user_not_connected', 'User might not be fully connected.')}`)
-					}
-				} else {
-					// 公共频道文件发送
-					// Send file to public channel
-					rd.chat.sendChannelMessage(msgWithUser.type, msgWithUser);
-					
-					// 添加到自己的聊天记录
-					if (msgWithUser.type === 'file_start') {
-						addMsg(msgWithUser, false, 'file');
-					}
-				}
-			}		}
+		onSend: (message, context) => {
+			const { room: rd, targetId, targetName } = context;
+			if (!roomsData.includes(rd) || !rd.connected || !rd.chat?.isOpen()) throw new Error('Room is disconnected');
+			const msgWithUser = { ...message, userName: rd.myUserName || '' };
+			if (targetId) {
+				const target = rd.chat.channel[targetId];
+				if (!target?.shared) throw new Error('Private recipient is disconnected');
+				const payload = { a: 'm', t: message.type + '_private', d: msgWithUser };
+				const relay = { a: 'c', p: rd.chat.encryptClientMessage(payload, target.shared), c: targetId };
+				rd.chat.sendMessage(rd.chat.encryptServerMessage(relay, rd.chat.serverShared));
+			} else {
+				rd.chat.sendChannelMessage(message.type, msgWithUser);
+			}
+			if (message.type === 'file_start') {
+				rd.messages.push({ id: message.fileId, type: 'me', text: msgWithUser, msgType: targetId ? 'file_private' : 'file', peerName: targetName, timestamp: Date.now() });
+				if (roomsData[activeRoomIndex] === rd) renderChatArea();
+			}
+		}
 	});
 
 

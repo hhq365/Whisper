@@ -11,9 +11,9 @@ COPY server/package.json ./server/
 # 安装生产依赖
 RUN cd server && npm install --production --no-package-lock --no-audit
 
-# Copy only the server.js file
-# 仅复制 server.js 文件
-COPY server/server.js ./server/
+# Copy the backend and room presence metadata service
+# 复制服务端及房间在线状态管理模块
+COPY server/server.js server/room-presence.cjs ./server/
 
 # Frontend build stage
 # 前端构建阶段
@@ -52,7 +52,7 @@ RUN apk add --no-cache nodejs nginx && \
 # Copy server files and static files
 # 复制服务器文件和静态文件
 COPY --from=backend-builder /app/server/node_modules /app/server/node_modules
-COPY --from=backend-builder /app/server/*.js /app/server/
+COPY --from=backend-builder /app/server/*.js /app/server/*.cjs /app/server/
 # Copy built frontend files from the frontend build stage
 # 从前端构建阶段复制构建好的文件，而不是复制 dist 目录
 COPY --from=frontend-builder /app/dist/ /app/client/

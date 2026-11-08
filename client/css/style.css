@@ -1861,3 +1861,11 @@ flex-direction: column;
 h2{
 	margin: 0%;
 }
+.local-history-controls { padding: 8px 16px; font-size: 12px; line-height: 1.5; flex-shrink: 0; }
+.local-history-controls button { margin-left: 8px; cursor: pointer; font: inherit; }
+.local-history-controls [hidden] { display: none !important; }
+
+/* Status notices use the same centered pill treatment as conversation events. */
+.local-history-controls:not(:has(> :not([hidden]))) { display: none; }
+.local-history-controls { text-align: center; }
+.local-history-controls > :not([hidden]) { display: table; margin: 4px auto; padding: 8px 16px; border-radius: 24px; background: rgba(255,255,255,.65); color: #555; }

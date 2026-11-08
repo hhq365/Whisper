@@ -1,3 +1,6 @@
+import { RoomHistory } from './util.roomHistory.js';
+import { saveMessage, clearHistory, revokeRoomHistory } from './util.history.js';
+import { readSession, writeSession, roomURL, invitationData } from './util.session.js';
 // Room management logic for NodeCrypt web client
 // NodeCrypt 网页客户端的房间管理逻辑
 
@@ -35,6 +38,7 @@ export function getNewRoomData() {
 		myUserName: '',
 		chat: null,
 		messages: [],
+		fileTransfers: new Map(),
 		prevUserList: [],
 		knownUserIds: new Set(),
 		unreadCount: 0,
@@ -57,7 +61,8 @@ export function switchRoom(index) {
 	renderMainHeader();
 	renderUserList(false);
 	renderChatArea();
-	updateChatInputStyle()
+	updateChatInputStyle();
+	persistSession();
 }
 
 // Set the sidebar avatar
@@ -94,50 +99,127 @@ export function renderRooms(activeId = 0) {
 
 // Join a room
 // 加入一个房间
-export function joinRoom(userName, roomName, password, modal = null, onResult) {
+export function joinRoom(userName, roomName, password, modal = null, onResult, saved = null) {
 	const newRd = getNewRoomData();
-	newRd.roomName = roomName;
-	newRd.myUserName = userName;
-	newRd.password = password;
+	Object.assign(newRd, { roomName, myUserName: userName, password, connected: false });
 	roomsData.push(newRd);
 	const idx = roomsData.length - 1;
+	const invitation = invitationData();
+	const options = saved || (invitation?.roomName === roomName && invitation.password === password ? invitation : {});
+	newRd.history = new RoomHistory(newRd, options.sharedHistory, {
+		error: historyError,
+		incoming: message => {
+			if (roomsData[activeRoomIndex] !== newRd) { newRd.unreadCount++; renderRooms(activeRoomIndex); }
+			window.notifyMessage?.(newRd.roomName, message.msgType, message.text, message.userName);
+		},
+		render: () => { if (roomsData[activeRoomIndex] === newRd) renderChatArea(); },
+		remember: (m, attachment) => rememberMessage(newRd, m, attachment, true),
+		ready: () => {
+			if (newRd.securedEpoch !== newRd.history.epoch) {
+				newRd.securedEpoch = newRd.history.epoch;
+				newRd.messages.push({ type: 'system', text: t('system.secured'), timestamp: Date.now() });
+			}
+			newRd.joined = true;
+			if (modal) modal.remove();
+			persistSession();
+			if (roomsData[activeRoomIndex] === newRd) renderChatArea();
+			report(true);
+		}
+	});
 	switchRoom(idx);
-	const sidebarUsername = $id('sidebar-username');
-	if (sidebarUsername) sidebarUsername.textContent = userName;
-	setSidebarAvatar(userName);
-	let closed = false;
+	if (!modal) {
+		$id('login-container').style.display = 'none';
+		$id('chat-container').style.display = '';
+	}
+	let reported = false;
+	const report = success => {
+		if (!reported && onResult) onResult(success);
+		reported = true;
+	};
 	const callbacks = {
 		onServerClosed: () => {
-			setStatus('Node connection closed');
-			if (onResult && !closed) {
-				closed = true;
-				onResult(false)
-			}
-		},		onServerSecured: () => {
-			if (modal) modal.remove();
-			else {
-				const loginContainer = $id('login-container');
-				if (loginContainer) loginContainer.style.display = 'none';
-				const chatContainer = $id('chat-container');
-				if (chatContainer) chatContainer.style.display = '';
-				
-
-			}
-			if (onResult && !closed) {
-				closed = true;
-				onResult(true)
-			}
-			addSystemMsg(t('system.secured', 'connection secured'))
+			if (!roomsData.includes(newRd)) return;
+			newRd.connected = false;
+			if (roomsData[activeRoomIndex] === newRd) renderChatArea();
+			report(false);
 		},
-		onClientSecured: (user) => handleClientSecured(idx, user),
-		onClientList: (list, selfId) => handleClientList(idx, list, selfId),
-		onClientLeft: (clientId) => handleClientLeft(idx, clientId),
-		onClientMessage: (msg) => handleClientMessage(idx, msg)
+		onRoomState: info => newRd.history.info(info),
+		// Resolve current indices: exiting another room can shift this room's index.
+		onClientSecured: user => { handleClientSecured(roomsData.indexOf(newRd), user); newRd.history.sync(); },
+		onClientList: (list, selfId) => handleClientList(roomsData.indexOf(newRd), list, selfId),
+		onClientLeft: clientId => handleClientLeft(roomsData.indexOf(newRd), clientId),
+		onClientMessage: msg => handleClientMessage(roomsData.indexOf(newRd), msg)
 	};
 	const chatInst = new window.NodeCrypt(window.config, callbacks);
+	newRd.chat = chatInst;
+	chatInst.roomJoin = { historyToken: options.historyToken, resumeToken: options.sharedHistory?.resumeToken };
 	chatInst.setCredentials(userName, roomName, password);
 	chatInst.connect();
-	roomsData[idx].chat = chatInst
+	return newRd;
+}
+
+function historyError(error) {
+	console.warn('Local history unavailable', error);
+	const notice = document.getElementById('history-error');
+	if (notice) notice.hidden = false;
+}
+
+export function rememberMessage(rd, message, attachment = null, imported = false) {
+	if (!rd || rd.left || !['text', 'text_private', 'image', 'image_private', 'file', 'file_private'].includes(message.msgType)) return;
+	// Incomplete transfers must not become broken download cards after a refresh.
+	if (message.msgType.startsWith('file') && !attachment) return;
+	message.id ||= message.msgType === 'file' ? message.text.fileId : crypto.randomUUID();
+	const published = imported ? null : rd.history?.publish(message, attachment);
+	if (attachment) message.attachmentId = message.id;
+	rd.pendingWrites = (rd.pendingWrites || 0) + 1;
+	updateSavingStatus(rd);
+	rd.historyQueue = (rd.historyQueue || Promise.resolve()).then(async () => {
+		if (!rd.left) await saveMessage(await rd.scope, message, attachment);
+		await published;
+	}).catch(historyError).finally(() => {
+		rd.pendingWrites--;
+		updateSavingStatus(rd);
+	});
+	return rd.historyQueue;
+}
+
+function updateSavingStatus(rd) {
+	const saving = document.getElementById('history-saving');
+	if (saving && roomsData[activeRoomIndex] === rd) saving.hidden = !rd.pendingWrites;
+}
+
+export function rememberFile(rd, transfer) {
+	const message = rd.messages.find(m => m.text?.fileId === transfer.fileId && ['file', 'file_private'].includes(m.msgType));
+	if (!message || transfer.status !== 'completed') return;
+	const attachment = new Blob([JSON.stringify(transfer.volumeData)], { type: 'application/json' });
+	rememberMessage(rd, message, attachment);
+}
+
+function persistSession() {
+	const saved = roomsData.filter(rd => rd.joined);
+	const current = roomsData[activeRoomIndex];
+	if (!writeSession(saved.map(rd => ({ userName: rd.myUserName, roomName: rd.roomName, password: rd.password, sharedHistory: rd.sharedHistory })), Math.max(0, saved.indexOf(current)))) {
+		const notice = document.getElementById('session-error');
+		if (notice) notice.hidden = false;
+	}
+	if (current?.joined) history.replaceState({}, '', roomURL(current.roomName, current.password));
+}
+
+export function restoreSession() {
+	const saved = readSession();
+	if (!saved?.rooms.length) return;
+	const invitation = invitationData();
+	let active = Number.isInteger(saved.active) ? saved.active : 0;
+	if (invitation !== null) {
+		const matches = rd => rd?.roomName === invitation.roomName && rd.password === invitation.password;
+		if (!matches(saved.rooms[active])) active = saved.rooms.findIndex(matches);
+		if (active < 0) return; // A different invitation takes precedence.
+	}
+	for (const room of saved.rooms) {
+		const rd = joinRoom(room.userName, room.roomName, room.password, null, null, room);
+		rd.joined = true; // Retain saved rooms while an offline reconnect is pending.
+	}
+	switchRoom(Math.min(Math.max(active, 0), roomsData.length - 1));
 }
 
 // Handle the client list update
@@ -208,6 +290,7 @@ export function handleClientSecured(idx, user) {
 export function handleClientLeft(idx, clientId) {
 	const rd = roomsData[idx];
 	if (!rd) return;
+	rd.history?.peerLeft(clientId);
 	if (rd.privateChatTargetId === clientId) {
 		rd.privateChatTargetId = null;
 		rd.privateChatTargetName = null;
@@ -236,9 +319,11 @@ export function handleClientLeft(idx, clientId) {
 export function handleClientMessage(idx, msg) {
 	const newRd = roomsData[idx];
 	if (!newRd) return;
+	if (newRd.history.receive(msg)) return;
+	msg.userName ||= msg.username;
 
 	// Prevent processing own messages unless it's a private message sent to oneself
-	if (msg.clientId === newRd.myId && msg.userName === newRd.myUserName && !msg.type.includes('_private')) {
+	if (msg.clientId === newRd.myId && msg.userName === newRd.myUserName && !(msg.type || 'text').includes('_private')) {
 		return;
 	}
 
@@ -262,12 +347,13 @@ export function handleClientMessage(idx, msg) {
 
 				if (!messageAlreadyInHistory) {
 					newRd.messages.push({
+						id: fileId,
 						type: 'other',
 						text: msg.data, // This is the file metadata object
 						userName: realUserName,
 						avatar: realUserName,
 						msgType: historyMsgType,
-						timestamp: (msg.data && msg.data.timestamp) || Date.now() 
+						timestamp: Date.now()
 					});
 				}
 			}
@@ -278,19 +364,11 @@ export function handleClientMessage(idx, msg) {
 			}
 		}
 
-		// Part 2: Handle UI interaction (rendering in active room, or unread count in inactive room)
-		if (activeRoomIndex === idx) {
-			// If it's the active room, delegate to util.file.js to handle UI and file transfer state.
-			// This applies to all file-related messages (file_start, file_volume, file_end, etc.)
-			if (window.handleFileMessage) {
-				window.handleFileMessage(msg.data, msgType.includes('_private'));
-			}
-		} else {
-			// If it's not the active room, only increment unread count for 'file_start' messages.
-			if (msgType === 'file_start' || msgType === 'file_start_private') {
-				newRd.unreadCount = (newRd.unreadCount || 0) + 1;
-				renderRooms(activeRoomIndex);
-			}
+		// Receive all volumes even when another room is active.
+		if (window.handleFileMessage) window.handleFileMessage(msg.data, msgType.includes('_private'), newRd);
+		if (activeRoomIndex !== idx && (msgType === 'file_start' || msgType === 'file_start_private')) {
+			newRd.unreadCount = (newRd.unreadCount || 0) + 1;
+			renderRooms(activeRoomIndex);
 		}
 		return; // File messages are fully handled.
 	}
@@ -320,6 +398,8 @@ export function handleClientMessage(idx, msg) {
 		msgType: msgType,
 		timestamp: Date.now()
 	});
+
+	rememberMessage(newRd, newRd.messages[newRd.messages.length - 1]);
 
 	// Only add message to chat display if it's for the active room
 	if (activeRoomIndex === idx) {
@@ -356,25 +436,44 @@ export function togglePrivateChat(targetId, targetName) {
 
 // Exit the current room
 // 退出当前房间
-export function exitRoom() {
-	if (activeRoomIndex >= 0 && roomsData[activeRoomIndex]) {
-		const chatInst = roomsData[activeRoomIndex].chat;
-		if (chatInst && typeof chatInst.destruct === 'function') {
-			chatInst.destruct()
-		} else if (chatInst && typeof chatInst.disconnect === 'function') {
-			chatInst.disconnect()
-		}
-		roomsData[activeRoomIndex].chat = null;
-		roomsData.splice(activeRoomIndex, 1);
-		if (roomsData.length > 0) {
-			switchRoom(0);
-			return true
-		} else {
-			return false
-		}
+export async function exitRoom() {
+	const rd = roomsData[activeRoomIndex];
+	if (!rd) return false;
+	rd.left = true;
+	const chat = rd.chat;
+	rd.chat = null;
+	roomsData.splice(activeRoomIndex, 1);
+	chat?.destruct?.();
+	rd.messages = [];
+	rd.fileTransfers.clear();
+	if (roomsData.length) switchRoom(0);
+	else {
+		activeRoomIndex = -1;
+		persistSession();
+		history.replaceState({}, '', location.pathname);
 	}
-	return false
+	// Wait for already-started writes, then revoke this room's key and delete its data.
+	try {
+		const scope = await rd.scope;
+		revokeRoomHistory(scope);
+		await rd.historyQueue;
+		await clearHistory(scope);
+	} catch (error) { historyError(error); }
+	return roomsData.length > 0;
 }
+
+window.addEventListener('whisper-session-ended', () => {
+	for (const rd of roomsData) {
+		rd.left = true;
+		rd.chat?.destruct?.();
+		rd.messages = [];
+		rd.fileTransfers.clear();
+	}
+	roomsData = [];
+	activeRoomIndex = -1;
+	const area = document.getElementById('chat-area');
+	if (area) area.replaceChildren();
+});
 
 export { roomsData, activeRoomIndex };
 

@@ -1,7 +1,7 @@
 {
-  "name": "nodecrypt-server",
+  "name": "whisper-server",
   "version": "1.0.0",
-  "description": "NodeCrypt Server",
+  "description": "Whisper",
   "main": "server.js",
   "author": "Zoltan Hajdu",
   "license": "ISC",

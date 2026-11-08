@@ -1,7 +1,7 @@
 {
-  "name": "nodecrypt",
+  "name": "whisper",
   "version": "1.0.0",
-  "description": "端到端加密房间",
+  "description": "Whisper",
   "main": "worker/index.js",
   "scripts": {
     "build": "vite build",

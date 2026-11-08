@@ -35,6 +35,7 @@ class NodeCrypt {
 			onClientSecured: callbacks.onClientSecured || null,
 			onClientList: callbacks.onClientList || null,
 			onClientMessage: callbacks.onClientMessage || null,
+			onRoomState: callbacks.onRoomState || null,
 		};
 		this.SERVER_KEY_STORAGE = 'nodecrypt_server_key';
 		try {
@@ -48,6 +49,8 @@ class NodeCrypt {
 		this.connection = null;
 		this.reconnect = null;
 		this.ping = null;
+		this.roomRequests = new Map();
+		this.roomJoin = {};
 		this.channel = {};
 		this.setCredentials = this.setCredentials.bind(this);
 		this.connect = this.connect.bind(this);
@@ -79,7 +82,7 @@ class NodeCrypt {
 		try {
 			this.credentials = {
 				username: username,
-				channel: sha256(channel),
+				channel: sha256(JSON.stringify(['whisper-v2', channel, password])),
 				password: sha256(password)
 			}
 		} catch (error) {
@@ -134,6 +137,9 @@ class NodeCrypt {
 		this.callbacks.onClientSecured = null;
 		this.callbacks.onClientList = null;
 		this.callbacks.onClientMessage = null;
+		this.callbacks.onRoomState = null;
+		for (const request of this.roomRequests.values()) { clearTimeout(request.timer); request.reject(new Error('disconnected')); }
+		this.roomRequests.clear();
 		this.clientEc = null;
 		this.serverKeys = null;
 		this.serverShared = null;
@@ -217,7 +223,8 @@ class NodeCrypt {
 					}, this.serverKeys.privateKey, 384)).slice(8, 40);
 					this.sendMessage(this.encryptServerMessage({
 						a: 'j',
-						p: this.credentials.channel
+						p: this.credentials.channel,
+						...this.roomJoin
 					}, this.serverShared));
 					if (this.callbacks.onServerSecured) {
 						try {
@@ -236,6 +243,17 @@ class NodeCrypt {
 		this.logEvent('onMessage-server-decrypted', serverDecrypted);
 		if (!this.isObject(serverDecrypted) || !this.isString(serverDecrypted.a)) {
 			return
+		}
+		if (serverDecrypted.a === 'room_state') {
+			if (serverDecrypted.op === 'reply') {
+				const pending = this.roomRequests.get(serverDecrypted.id);
+				if (pending) {
+					clearTimeout(pending.timer); this.roomRequests.delete(serverDecrypted.id);
+					if (serverDecrypted.error) pending.reject(new Error(serverDecrypted.error));
+					else pending.resolve(serverDecrypted.result);
+				}
+			} else this.callbacks.onRoomState?.(serverDecrypted);
+			return;
 		}
 		if (serverDecrypted.a === 'l' && this.isArray(serverDecrypted.p)) {
 			try {
@@ -373,6 +391,8 @@ class NodeCrypt {
 	// WebSocket close event handler
 	// WebSocket 关闭事件处理
 	async onClose(event) {
+		for (const request of this.roomRequests.values()) { clearTimeout(request.timer); request.reject(new Error('disconnected')); }
+		this.roomRequests.clear();
 		this.logEvent('onClose', event);
 		this.disconnect();
 		if (this.credentials) {
@@ -513,6 +533,24 @@ class NodeCrypt {
 			}
 		}
 		return (false)
+	}
+
+	requestRoomState(op, data = {}) {
+		return new Promise((resolve, reject) => {
+			const id = crypto.randomUUID();
+			const timer = setTimeout(() => { this.roomRequests.delete(id); reject(new Error('room_state_timeout')); }, 15000);
+			this.roomRequests.set(id, { resolve, reject, timer });
+			if (!this.sendMessage(this.encryptServerMessage({ a: 'room_state', op, id, ...data }, this.serverShared))) {
+				clearTimeout(timer); this.roomRequests.delete(id); reject(new Error('disconnected'));
+			}
+		});
+	}
+
+	sendPeerMessage(clientId, type, data) {
+		const target = this.channel[clientId];
+		if (!target?.shared || !target.username) return false;
+		const p = this.encryptClientMessage({ a: 'm', t: type, d: data }, target.shared);
+		return this.sendMessage(this.encryptServerMessage({ a: 'c', c: clientId, p }, this.serverShared));
 	}
 
 	// Encrypt a message for the server

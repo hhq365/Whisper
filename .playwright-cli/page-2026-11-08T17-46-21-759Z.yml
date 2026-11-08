@@ -1,0 +1,69 @@
+- generic [ref=f52e2]:
+  - generic [ref=f52e4]:
+    - generic [ref=f52e5]:
+      - button "使用说明" [ref=f52e6] [cursor=pointer]
+      - heading "进入新的房间" [level=1] [ref=f52e11]
+    - generic [ref=f52e12]:
+      - heading "使用说明" [level=2] [ref=f52e13]
+      - generic [ref=f52e14]:
+        - generic [ref=f52e15]:
+          - heading "🔐 什么是 Whisper？" [level=3] [ref=f52e16]
+          - paragraph [ref=f52e17]: Whisper 是一个真正的端到端加密聊天系统。采用无数据库架构，所有消息在您的设备上本地加密，服务器仅作为加密数据的中转站，无法获取您的任何明文内容。
+        - generic [ref=f52e18]:
+          - heading "🚀 快速开始" [level=3] [ref=f52e19]
+          - list [ref=f52e20]:
+            - listitem [ref=f52e21]:
+              - strong [ref=f52e22]: 输入用户名
+              - text: ： 选择一个在房间中显示的昵称，可以是任何您喜欢的名称
+            - listitem [ref=f52e23]:
+              - strong [ref=f52e24]: 设置房间名
+              - text: ： 房间的唯一标识符，相当于房间号
+            - listitem [ref=f52e25]:
+              - strong [ref=f52e26]: 设置房间密码
+              - text: ： 用于区分不同房间，同时参与加密过程，提升安全性
+            - listitem [ref=f52e27]:
+              - strong [ref=f52e28]: 点击"加入房间"
+              - text: ： 系统将自动生成加密密钥，开始安全聊天
+          - generic [ref=f52e29]:
+            - strong [ref=f52e30]: ⚠️ 重要提示
+            - text: ：相同房间名但不同密码的是两个完全独立的房间，无法相互通信。
+        - generic [ref=f52e31]:
+          - heading "🔑 安全特性" [level=3] [ref=f52e32]
+          - list [ref=f52e33]:
+            - listitem [ref=f52e34]:
+              - strong [ref=f52e35]: 🛡️ 端到端加密
+              - text: ： 使用 AES-256 + ECDH 加密算法，消息仅您和接收者可解密
+            - listitem [ref=f52e36]:
+              - strong [ref=f52e37]: 🔐 密码增强加密
+              - text: ： 房间密码直接参与加密密钥生成，提供额外的安全保护层
+            - listitem [ref=f52e38]:
+              - strong [ref=f52e39]: 💾 房间记录
+              - text: ： 公共记录由在线成员保管，全员离开后仅保留10秒刷新重连窗口。分享房间只接收和保存加入后的消息；分享房间和记录仅包含分享者生成链接时可见的公共记录。
+            - listitem [ref=f52e40]:
+              - strong [ref=f52e41]: 🎭 完全匿名
+              - text: ： 无需注册账户，不收集任何个人信息
+            - listitem [ref=f52e42]:
+              - strong [ref=f52e43]: 🌐 去中心化
+              - text: ： 支持自托管部署，服务器不参与加密解密过程
+        - generic [ref=f52e44]:
+          - heading "💡 使用技巧" [level=3] [ref=f52e45]
+          - list [ref=f52e46]:
+            - listitem [ref=f52e47]:
+              - strong [ref=f52e48]: 私人对话
+              - text: ：使用复杂的房间名和密码，只分享给特定人员
+            - listitem [ref=f52e49]:
+              - strong [ref=f52e50]: 群聊
+              - text: ：使用简单易记的房间名和密码，方便多人加入
+            - listitem [ref=f52e51]:
+              - strong [ref=f52e52]: 安全提醒
+              - text: ：房间名和密码都需要完全一致才能进入同一个房间
+            - listitem [ref=f52e53]:
+              - strong [ref=f52e54]: 密码策略
+              - text: ：建议使用包含字母、数字和符号的强密码
+  - generic [ref=f52e55]:
+    - text: Powered by
+    - link "Whisper" [ref=f52e56] [cursor=pointer]:
+      - /url: https://github.com/shuaiplus/NodeCrypt
+    - text: © 2025 by
+    - link "@shuaiplus" [ref=f52e57] [cursor=pointer]:
+      - /url: https://github.com/shuaiplus
