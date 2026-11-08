@@ -9,21 +9,29 @@ export function beginSession() {
 	initialized = true;
 	let previous;
 	try { previous = JSON.parse(sessionStorage.getItem(VAULT)); } catch {}
-	const reload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
+	const navigationType = performance.getEntriesByType('navigation')[0]?.type;
+	const reload = navigationType === 'reload';
+	const sameURLReload = navigationType === 'navigate' && previous?.resumeURL === location.href;
 	// A real reload can resume without an unload handoff: mobile browsers may skip pagehide.
-	// Ordinary navigation still starts fresh; explicit exit removes the stored session.
-	if (reload && previous?.id && previous?.keys && typeof previous.keys === 'object') vault = previous;
+	// Address-bar navigation needs a one-use same-URL handoff; other visits start fresh.
+	if ((reload || sameURLReload) && previous?.id && previous?.keys && typeof previous.keys === 'object') vault = previous;
 	else {
 		superseded = previous?.id;
 		vault = { id: crypto.randomUUID(), keys: {} };
 		try { sessionStorage.removeItem(KEY); } catch {}
 	}
 	vault.resumeOnReload = false;
+	delete vault.resumeURL;
 	persistVault();
 	return vault.id;
 }
-export function prepareSessionReload() {
-	if (!discarded) { vault.resumeOnReload = true; persistVault(); }
+export function prepareSessionReload(sameURL = false) {
+	if (!discarded) {
+		vault.resumeOnReload = true;
+		if (sameURL) vault.resumeURL = location.href;
+		else delete vault.resumeURL;
+		persistVault();
+	}
 }
 function persistVault() {
 	try { sessionStorage.setItem(VAULT, JSON.stringify(vault)); } catch {}

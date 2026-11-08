@@ -69,14 +69,22 @@ export function initializeHistoryLifecycle() {
 		if (event.persisted) { abandonHistory(); location.reload(); }
 	});
 	let knownDeparture = false;
+	let sameURLReload = false;
 	window.navigation?.addEventListener('navigate', event => {
 		if (event.downloadRequest != null || event.destination.sameDocument) return;
-		knownDeparture = event.navigationType !== 'reload';
+		// Address-bar Enter is a cross-document navigation to the exact same URL.
+		sameURLReload = event.navigationType !== 'traverse' && event.destination.url === location.href;
+		knownDeparture = event.navigationType !== 'reload' && !sameURLReload;
+		if (sameURLReload) prepareSessionReload(true);
 	});
 	window.addEventListener('pagehide', event => {
 		try { localStorage.setItem('whisper-detached:' + sessionId(), String(Date.now())); } catch {}
-		if (knownDeparture || event.persisted) abandonHistory();
-		else prepareSessionReload();
+		if (knownDeparture || (event.persisted && !sameURLReload)) abandonHistory();
+		else {
+			// Chrome may omit navigate for address-bar/browser-initiated loads.
+			// Hand off only this exact URL; beginSession consumes it once.
+			prepareSessionReload(true);
+		}
 		releaseOwner?.();
 	});
 	ready = (async () => {
