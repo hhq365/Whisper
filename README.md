@@ -7,7 +7,7 @@
 ### 一键部署到 Cloudflare Workers
 
 点击下方按钮即可一键部署到 Cloudflare Workers：
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button?projectName=NodeCrypt)](https://deploy.workers.cloudflare.com/?url=https://github.com/shuaiplus/nodecrypt)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button?projectName=Whisper)](https://deploy.workers.cloudflare.com/?url=https://github.com/hhq365/Whisper)
 
 - 构建命令：npm run build
 - 部署命令：npm run deploy
@@ -150,7 +150,7 @@ sequenceDiagram
 ---
 ## Star History
 
-[![Star History Chart](https://star-history.dera.page/svg?repos=shuaiplus/NodeCrypt&type=Timeline)](https://star-history.dera.page/#shuaiplus/NodeCrypt&Timeline)
+[![Star History Chart](https://star-history.dera.page/svg?repos=hhq365/Whisper&type=Timeline)](https://star-history.dera.page/#hhq365/Whisper&Timeline)
 
 **Whisper** - 真正的端到端加密通信 🔐
 

@@ -12,15 +12,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/shuaiplus/NodeCrypt.git"
+    "url": "git+https://github.com/hhq365/Whisper.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/shuaiplus/NodeCrypt/issues"
+    "url": "https://github.com/hhq365/Whisper/issues"
   },
-  "homepage": "https://github.com/shuaiplus/NodeCrypt#readme",
+  "homepage": "https://github.com/hhq365/Whisper#readme",
   "devDependencies": {
     "autoprefixer": "^10.4.21",
     "cssnano": "^7.0.7",

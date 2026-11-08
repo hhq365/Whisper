@@ -7,7 +7,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.repository == 'shuaiplus/nodecrypt'
+    permissions:
+      contents: read
+      packages: write
+    if: github.repository == 'hhq365/Whisper'
     steps:
       - uses: actions/checkout@v4
       - name: Log in to GitHub Container Registry
@@ -22,5 +25,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/shuaiplus/nodecrypt:latest
-            ghcr.io/shuaiplus/nodecrypt:${{ github.sha }}
+            ghcr.io/hhq365/whisper:latest
+            ghcr.io/hhq365/whisper:${{ github.sha }}

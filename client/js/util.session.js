@@ -10,7 +10,9 @@ export function beginSession() {
 	let previous;
 	try { previous = JSON.parse(sessionStorage.getItem(VAULT)); } catch {}
 	const reload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
-	if (reload && previous?.resumeOnReload && previous?.id && previous?.keys && typeof previous.keys === 'object') vault = previous;
+	// A real reload can resume without an unload handoff: mobile browsers may skip pagehide.
+	// Ordinary navigation still starts fresh; explicit exit removes the stored session.
+	if (reload && previous?.id && previous?.keys && typeof previous.keys === 'object') vault = previous;
 	else {
 		superseded = previous?.id;
 		vault = { id: crypto.randomUUID(), keys: {} };

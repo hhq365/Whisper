@@ -7,7 +7,7 @@
 ### Method 1: One-Click Deploy to Cloudflare Workers
 
 Click the button below for one-click deployment to Cloudflare Workers:
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button?projectName=NodeCrypt)](https://deploy.workers.cloudflare.com/?url=https://github.com/shuaiplus/NodeCrypt)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button?projectName=Whisper)](https://deploy.workers.cloudflare.com/?url=https://github.com/hhq365/Whisper)
 > Note: This method creates a new project based on the main repository. Future updates to the main repository will not be automatically synchronized.
 
 ### Method 2: Auto-Sync Fork and Deploy (Recommended for Long-term Maintenance)
@@ -18,7 +18,7 @@ Click the button below for one-click deployment to Cloudflare Workers:
 ### Method 3: Docker One-Click Deployment (Recommended for Self-hosting)
 
 ```bash
-docker run -d --name nodecrypt -p 80:80 ghcr.io/shuaiplus/nodecrypt
+docker run -d --name nodecrypt -p 80:80 ghcr.io/hhq365/whisper
 ```
 
 Access http://localhost:80
