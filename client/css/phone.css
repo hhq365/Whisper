@@ -208,30 +208,9 @@
 	background-color: transparent !important;
 }
 
-/* Mobile theme selector styles */
-/* 移动端主题选择器样式 */
-.theme-selector {
-	gap: 8px;
-	padding: 6px 2px;
-	/* Ensure scrollbars are hidden on mobile too */
-	scrollbar-width: none;
-	-ms-overflow-style: none;
-	/* Improve touch scrolling */
-	-webkit-overflow-scrolling: touch;
-}
-
-.theme-selector::-webkit-scrollbar {
-	display: none;
-}
-
+/* Theme tiles wrap naturally; gestures scroll the settings page vertically. */
 .theme-item {
-	width: 70px;
-	height: 70px;
-	/* Prevent text selection on mobile */
 	-webkit-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none;
 	user-select: none;
-	/* Prevent touch callouts */
 	-webkit-touch-callout: none;
 }

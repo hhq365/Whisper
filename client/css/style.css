@@ -214,31 +214,21 @@ flex-direction: column;
 /* Theme selector styles */
 /* 主题选择器样式 */
 .theme-selector {
-	display: flex;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
 	gap: 12px;
-	overflow-x: auto;
-	padding: 8px 4px;
+	padding: 8px;
 	border-radius: 8px;
 	background: #f8f9fa;
-	/* Hide scrollbars */
-	scrollbar-width: none; /* Firefox */
-	-ms-overflow-style: none; /* IE and Edge */
-	cursor: grab;
-}
-
-.theme-selector::-webkit-scrollbar {
-	display: none; /* Webkit browsers */
-}
-
-.theme-selector.dragging {
-	cursor: grabbing;
-	user-select: none;
 }
 
 .theme-item {
-	flex-shrink: 0;
-	width: 70px;
-	height: 70px;
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 0;
+	height: auto;
+	aspect-ratio: 1;
+	padding: 0;
 	border-radius: 12px;
 	border: 3px solid transparent;
 	cursor: pointer;
@@ -1869,3 +1859,5 @@ h2{
 .local-history-controls:not(:has(> :not([hidden]))) { display: none; }
 .local-history-controls { text-align: center; }
 .local-history-controls > :not([hidden]) { display: table; margin: 4px auto; padding: 8px 16px; border-radius: 24px; background: rgba(255,255,255,.65); color: #555; }
+
+.theme-item:focus-visible { outline: 2px solid #30a8f7; outline-offset: 3px; }
