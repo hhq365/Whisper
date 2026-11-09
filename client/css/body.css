@@ -572,3 +572,13 @@ body {
   position: relative;
   z-index: 1;
 }
+/* Match the login logo to the browser tab icon. */
+#login-title::before {
+  content: "";
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  margin-right: .25em;
+  vertical-align: -.15em;
+  background: url('../assets/favicon.svg') center / contain no-repeat;
+}
